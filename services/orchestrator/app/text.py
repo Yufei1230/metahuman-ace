@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 
-SENTENCE_RE = re.compile(r'(.+?(?:[。！？!?]|\.(?=\s))(?:[」』）】"]*)?)', re.DOTALL)
+SENTENCE_RE = re.compile(r'(.+?(?:[!?]|\.(?=\s))(?:[)\"]*)?)', re.DOTALL)
 
 
 def normalize_tts_text(text: str) -> str:

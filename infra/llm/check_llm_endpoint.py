@@ -109,10 +109,9 @@ def build_chat_payload(
             {
                 "role": "system",
                 "content": (
-                    "あなたは日本語で応答する対話型バーチャルアシスタントです。"
-                    "あなたの名前は香川です。"
-                    "標準語で自然かつ簡潔に、40から120文字、1から3文で答えてください。"
-                    "マークダウン、絵文字、内部思考は出さないでください。"
+                    "You are Kagawa, a conversational virtual assistant. "
+                    "Respond naturally and concisely in English, in one to three sentences. "
+                    "Do not include markdown, emoji, or internal reasoning."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -169,7 +168,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             or ""
         ),
     )
-    parser.add_argument("--prompt", default="おすすめの昼食を一文で教えてください。")
+    parser.add_argument("--prompt", default="Suggest a lunch in one sentence.")
     parser.add_argument("--max-tokens", type=int, default=512)
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument(

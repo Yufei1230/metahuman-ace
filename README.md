@@ -7,8 +7,7 @@ animation integration.
 
 The current focus is the **Unreal / MetaHuman experience**, with a Windows
 hosted NVIDIA speech and language backend and an optional Mac microphone client.
-The original Tokkio 5.0 / Kubernetes deployment tools remain available as a
-separate, optional workflow.
+The repository focuses on the English conversation workflow.
 
 ## Architecture
 
@@ -104,19 +103,19 @@ for dependencies, commands, audio format, and validation limits.
 | `unreal/Plugins/ACEConversation/` | Conversation bridge, audio playback, and test components |
 | `unreal/README.md` | MetaHuman and NVIDIA ACE integration instructions |
 | `docs/architecture/ace-sandbox.md` | Original sandbox architecture and protocol notes |
-| `infra/llm/` | LLM endpoint checks and optional local inference helpers |
+| `infra/llm/` | Hosted LLM endpoint checks |
 | `infra/compose/` | Optional Linux speech NIM deployment templates |
-| `infra/tokkio/` | Optional Tokkio 5.0 deployment tools |
-| `infra/rag/` | Optional retrieval tools and Tokkio RAG configuration |
-| `tts/` | Alternative speech synthesis workflow documentation |
-| `Irodori-TTS/` | Third-party TTS submodule, retained at its original pinned revision |
 
 ## Verification
 
-Run backend tests from the repository root after installing its dependencies:
+Run backend and microphone-client tests from the repository root after installing
+the backend and client dependencies:
 
 ```powershell
-.\services\orchestrator\.venv\Scripts\python.exe -m unittest discover -s services/orchestrator/tests
+.\services\orchestrator\.venv\Scripts\python.exe -m pip install -r services/orchestrator/tools/live_mic_requirements.txt
+Push-Location services/orchestrator
+.\.venv\Scripts\python.exe -m unittest discover -s tests
+Pop-Location
 .\services\orchestrator\.venv\Scripts\python.exe -m pip check
 ```
 
@@ -132,19 +131,10 @@ ASR connectivity requires the audio test. Verify Unreal playback and MetaHuman
 facial animation separately in the engine. Historical validation reports record
 the environments used for those runs, not a guarantee for a new installation.
 
-## Optional deployments and research workflows
+## Optional Linux services
 
-These components are preserved from the original repository and are separate
-from the primary MetaHuman + ACE setup:
-
-- [Tokkio 5.0 deployment](infra/tokkio/README.md) and
-  [reference architecture](docs/architecture/tokkio-reference-stack.md):
-  browser-first Kubernetes deployment.
 - [Linux speech NIM](infra/compose/README.md): local ASR/TTS service templates.
-- [LLM tooling](infra/llm/README.md): endpoint validation and local inference research.
-- [RAG tooling](infra/rag/README.md): local SQLite retrieval and NVIDIA RAG
-  Blueprint options for the documented Tokkio workflow.
-- [Alternative TTS](tts/README.md): additional speech synthesis research.
+- [LLM endpoint checks](infra/llm/README.md): hosted endpoint validation.
 
 ## Configuration and storage
 
@@ -154,12 +144,3 @@ runtime directories by default. Legacy Linux guides use `/data/ACE` and
 `/home2/ko66/ace-sandbox`; adapt those paths only when using those deployments.
 Historical Windows reports also contain machine-specific paths that must be
 adjusted for your environment.
-
-## Origin and third-party components
-
-This repository starts from a content snapshot of
-[Yufei1230/tokkio](https://github.com/Yufei1230/tokkio), with a new Git history and
-a README focused on MetaHuman + NVIDIA ACE. Existing source files and third-party
-references are retained. The [Irodori-TTS](https://github.com/Aratako/Irodori-TTS)
-submodule remains an external project with its own authors and license; a fresh
-commit history does not change third-party authorship or licensing.

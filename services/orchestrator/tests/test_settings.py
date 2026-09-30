@@ -44,27 +44,16 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.tts_voice, "Magpie-Multilingual.EN-US.Aria")
         self.assertIn("English", settings.system_prompt)
 
-    def test_japanese_configuration_preserves_prompt_and_voice(self) -> None:
-        with patch.dict(os.environ, {"ASSISTANT_LANGUAGE": "ja-JP"}, clear=True):
-            settings = Settings(_env_file=None)
-
-        self.assertEqual(settings.asr_language_code, "ja-JP")
-        self.assertEqual(settings.tts_language_code, "ja-JP")
-        self.assertEqual(settings.tts_voice, "Magpie-Multilingual.JA-JP.Louise")
-
-        self.assertIn("標準語", settings.system_prompt)
-        self.assertIn("香川", settings.system_prompt)
-        self.assertIn("40から120文字", settings.system_prompt)
-        self.assertIn("対話型バーチャルアシスタント", settings.system_prompt)
-        self.assertNotIn("大阪弁", settings.system_prompt)
-        self.assertNotIn("大藪", settings.system_prompt)
-        self.assertNotIn("/no_think", settings.system_prompt)
+    def test_other_language_requires_explicit_voice(self) -> None:
+        with patch.dict(os.environ, {"ASSISTANT_LANGUAGE": "fr-FR"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "Set ACE_TTS_VOICE"):
+                Settings(_env_file=None)
 
     def test_language_overrides_and_legacy_aliases(self) -> None:
-        with patch.dict(os.environ, {"ACE_ASR_LANGUAGE_CODE": "multi", "TTS_LANGUAGE": "ja-JP", "ACE_SYSTEM_PROMPT": "Custom prompt", "ACE_TTS_VOICE": "custom-voice"}, clear=True):
+        with patch.dict(os.environ, {"ACE_ASR_LANGUAGE_CODE": "multi", "TTS_LANGUAGE": "fr-FR", "ACE_SYSTEM_PROMPT": "Custom prompt", "ACE_TTS_VOICE": "custom-voice"}, clear=True):
             settings = Settings(_env_file=None)
         self.assertEqual(settings.asr_language_code, "multi")
-        self.assertEqual(settings.tts_language_code, "ja-JP")
+        self.assertEqual(settings.tts_language_code, "fr-FR")
         self.assertEqual(settings.system_prompt, "Custom prompt")
         self.assertEqual(settings.tts_voice, "custom-voice")
 

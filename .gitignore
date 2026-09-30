@@ -32,8 +32,6 @@
 /services/orchestrator/runtime/
 /data
 /infra/compose/.env
-/infra/tokkio/.env
-/infra/tokkio/workspace/
 /unreal/**/Binaries/
 /unreal/**/DerivedDataCache/
 /unreal/**/Intermediate/

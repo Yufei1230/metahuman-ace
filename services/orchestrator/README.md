@@ -115,93 +115,31 @@ Language configuration:
 | `ACE_TTS_SAMPLE_RATE_HZ` | `44100`; client reads actual frame rate |
 | `ACE_LOG_DIR`, `ACE_AUDIO_DIR` | Optional storage overrides; defaults are module-relative `runtime` directories |
 
-For Japanese, set all three language variables to `ja-JP`, set
-`ACE_TTS_VOICE=Magpie-Multilingual.JA-JP.Louise`, and leave `ACE_SYSTEM_PROMPT`
-blank. Remove old explicit language/prompt overrides when switching languages.
-Restart the service after configuration changes. Both listed voices were returned
-by the hosted server's `/v1/audio/list_voices` during Windows verification.
-Other languages require a voice from the server's actual list.
+Other languages require an explicit voice from the provider's voice list and an
+appropriate system prompt. Restart the service after configuration changes.
 
-Run tests from the repository root:
+## Verification
 
-```powershell
-.\services\orchestrator\.venv\Scripts\python.exe -m unittest discover -s services/orchestrator/tests
-.\services\orchestrator\.venv\Scripts\python.exe -m pip check
-```
-
-The Linux instructions below describe the original deployment option.
-
-FastAPI ベースの WebSocket オーケストレータです。役割は以下です。
-
-- Unreal から `16kHz mono PCM16` を受ける
-- VAD で EOS を検出する
-- ASR をストリーミングし `partial/final transcript` を返す
-- NVIDIA NIM API へ会話プロンプトを送り、streaming delta を返す
-- 文単位に区切って TTS を streaming し、受信 PCM を Unreal へ返す
-
-## Run
+From the repository root, with dependencies installed:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-cp .env.example .env
-python3 tools/init_storage.py
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+python3 -m pip install -r services/orchestrator/tools/live_mic_requirements.txt
+cd services/orchestrator
+python3 -m unittest discover -s tests
+cd ../..
+python3 -m pip check
 ```
 
-`.env.example` uses hosted NVIDIA NIM at `https://integrate.api.nvidia.com/v1`
-with `nvidia/nemotron-3.5-lightning-30b-a3b`. Set `ACE_NIM_API_KEY` in `.env`.
+## WebSocket protocol
 
-## Control Frames
+1. Send `session.start`.
+2. Send mono 16 kHz PCM16 microphone frames every 20 ms.
+3. Send `mic.end` when the utterance is complete.
+4. Receive transcript, LLM, state, and TTS events plus binary response audio.
 
-JSON text frame の envelope は以下です。
+Binary audio uses a 32-byte `ACE1` header. See
+[architecture and protocol](../../docs/architecture/ace-sandbox.md) for details.
 
-```json
-{
-  "type": "state",
-  "session_id": "a79e3ab3-4fbf-4ffc-b0fa-ad16bb6f8139",
-  "turn_id": "eb799a38-19f1-4eb5-ad54-96bdf9518efe",
-  "timestamp": "2026-04-21T07:00:00Z",
-  "payload": {
-    "state": "SPEAKING"
-  }
-}
-```
-
-### Required Client Flow
-
-1. `session.start` を送る
-2. `kind=mic` の binary frame を 20ms ごとに送る
-3. クライアント側で明示的に終端が分かる場合は `mic.end` を送る
-4. `asr.partial` / `asr.final` / `llm.delta` / `tts.start` / binary `tts` / `tts.end` を受ける
-
-## Binary Audio Frames
-
-- magic: `ACE1`
-- version: `1`
-- kind: `1=mic`, `2=tts`
-- codec: `1=PCM_S16LE`
-- channels: `1`
-- sample rate: big-endian uint32
-- payload size: big-endian uint32
-- turn id bytes: 16 bytes
-- payload: raw PCM16
-
-## Notes
-
-- `ACE_MOCK_ASR=true`
-- `ACE_MOCK_LLM=true`
-- `ACE_MOCK_TTS=true`
-
-を指定すると、外部サービスなしで WebSocket の疎通確認だけ先に進められます。
-
-## Utilities
-
-- `tools/init_storage.py`: initializes persistent directories under the service-local `runtime/` directory by default
-- `tools/demo_client.py`: WAV もしくは疑似マイク音声で orchestrator と会話フローを検証する
-
-## HTTP Endpoints
-
-- `GET /healthz`: プロセス生存確認
-- `GET /status`: ASR / TTS / LLM の接続状態とモック設定を返す
+Set `ACE_MOCK_ASR=true`, `ACE_MOCK_LLM=true`, and `ACE_MOCK_TTS=true` to test
+session connectivity without external providers. Mock tests do not validate
+provider connectivity or MetaHuman animation.

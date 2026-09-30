@@ -15,15 +15,6 @@ DEFAULT_SYSTEM_PROMPT = (
     "Do not include markdown, lists, emoji, or internal reasoning. "
     "Ask for clarification when information is missing rather than inventing facts."
 )
-JAPANESE_SYSTEM_PROMPT = (
-    "あなたは日本語で応答する対話型バーチャルアシスタントです。"
-    "あなたの名前は香川です。"
-    "標準語で自然かつ簡潔に答えてください。"
-    "40から120文字を目安に、1から3文で答えてください。"
-    "箇条書き、番号付きリスト、マークダウン、絵文字、記号装飾、内部思考は出さないでください。"
-    "質問に必要な情報が不足している場合は、推測で断定せず、確認してください。"
-    "ユーザー発話の前に「参考情報」ブロックがある場合は、その内容を事実として扱い、自然な標準語で短く織り込んでください。"
-)
 
 
 class Settings(BaseSettings):
@@ -93,13 +84,13 @@ class Settings(BaseSettings):
         self.asr_language_code = self.asr_language_code or self.assistant_language
         self.tts_language_code = self.tts_language_code or self.assistant_language
         if not self.tts_voice:
-            voices = {"en-US": "Magpie-Multilingual.EN-US.Aria", "ja-JP": "Magpie-Multilingual.JA-JP.Louise"}
+            voices = {"en-US": "Magpie-Multilingual.EN-US.Aria"}
             if self.tts_language_code not in voices:
                 raise ValueError("Set ACE_TTS_VOICE for this TTS language using the server voice list")
             self.tts_voice = voices[self.tts_language_code]
         if not self.system_prompt:
-            self.system_prompt = JAPANESE_SYSTEM_PROMPT if self.assistant_language == "ja-JP" else DEFAULT_SYSTEM_PROMPT
-            if self.assistant_language not in {"en-US", "ja-JP"}:
+            self.system_prompt = DEFAULT_SYSTEM_PROMPT
+            if self.assistant_language != "en-US":
                 self.system_prompt = self.system_prompt.replace("English", self.assistant_language)
         self.asr_api_key = self.asr_api_key or self.nim_api_key
         return self

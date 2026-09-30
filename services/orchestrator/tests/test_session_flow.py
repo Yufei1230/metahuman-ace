@@ -43,10 +43,10 @@ class FakeAsrStream:
     async def push_audio(self, chunk: bytes) -> None:
         self.audio.extend(chunk)
         if len(self.audio) >= 640:
-            await self.queue.put(AsrEvent(kind="partial", text="こんにちは"))
+            await self.queue.put(AsrEvent(kind="partial", text="Hello"))
 
     async def end(self) -> None:
-        await self.queue.put(AsrEvent(kind="final", text="こんにちは"))
+        await self.queue.put(AsrEvent(kind="final", text="Hello"))
         await self.queue.put(None)
 
     async def cancel(self) -> None:
@@ -78,8 +78,8 @@ class FailingAsrClient:
 
 class FakeLlmClient:
     async def stream_chat(self, user_text: str):
-        yield "はい、"
-        yield "応答します。"
+        yield "Yes, "
+        yield "here is my response!"
 
 
 class FakeTtsClient:
@@ -125,7 +125,7 @@ class SessionFlowTests(unittest.TestCase):
                         "type": "session.start",
                         "session_id": None,
                         "timestamp": "2026-04-21T00:00:00Z",
-                        "payload": {"locale": "ja-JP"},
+                        "payload": {"locale": "en-US"},
                     },
                     ensure_ascii=False,
                 ),

@@ -14,12 +14,12 @@ class SentenceChunkerTests(unittest.TestCase):
         self.assertEqual(chunker.flush(), "")
     def test_chunker_emits_complete_sentences(self) -> None:
         chunker = SentenceChunker()
-        first = chunker.push("今日は")
-        second = chunker.push("晴れです。明日")
-        third = chunker.push("も晴れるでしょう。")
+        first = chunker.push("It is ")
+        second = chunker.push("sunny today!Tomorrow ")
+        third = chunker.push("will also be sunny!")
         self.assertEqual(first, [])
-        self.assertEqual(second, ["今日は晴れです。"])
-        self.assertEqual(third, ["明日も晴れるでしょう。"])
+        self.assertEqual(second, ["It is sunny today!"])
+        self.assertEqual(third, ["Tomorrow will also be sunny!"])
 
 
 if __name__ == "__main__":

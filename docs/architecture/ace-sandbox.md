@@ -1,116 +1,71 @@
-# Linux RTX Audio2Face Sandbox Architecture
+# MetaHuman + ACE Conversation Architecture
 
-`Tokkio` を主経路にする場合は [tokkio-reference-stack.md](/home/kyano/workspace/ACE/ace_kagawa/docs/architecture/tokkio-reference-stack.md) を参照してください。この文書は Unreal 直結の研究サンドボックス用です。
+The primary workflow uses Unreal Engine 5.6 for MetaHuman rendering, microphone
+capture, response playback, and NVIDIA ACE Audio2Face integration. A FastAPI
+backend coordinates hosted NVIDIA ASR, LLM, and TTS providers. A Mac microphone
+client can publish audio to the backend and mirror responses to an Unreal
+observer; see the [live microphone guide](../../services/orchestrator/tools/LIVE_MIC_CLIENT.md).
 
-## Goal
+## Runtime and state
 
-対象は `Linux RTX` 単一ワークステーション上の `リアルタイム half-duplex` 会話アバターです。`GPU0` を Unreal/MetaHuman 表示用、`GPU1` を Speech NIM 用に固定します。会話状態は `LISTENING -> THINKING -> SPEAKING -> LISTENING` の 4 状態に限定し、`THINKING` と `SPEAKING` 中の新規ユーザー発話は処理しません。
+The half-duplex turn cycle is `LISTENING -> THINKING -> SPEAKING -> LISTENING`.
+The orchestrator manages sessions, utterance completion, provider calls,
+sentence-based synthesis, response audio, and per-turn logs. Hosted ASR buffers
+an utterance before offline recognition; LLM responses stream and completed
+sentences are synthesized into PCM chunks.
 
-## Runtime Split
+The Unreal bridge passes response PCM to the playback component and provides
+hook points for ACE Audio2Face. Installing the ACE plugin and wiring those hooks
+and the MetaHuman animation blueprint are separate engine-side steps.
 
-- `Unreal Engine 5.6`
-  - MetaHuman 描画
-  - マイク入力取得
-  - orchestrator との WebSocket 接続
-  - TTS PCM の再生
-  - ACE `Audio2Face-3D` への PCM 入力
-- `services/orchestrator`
-  - WebSocket セッション管理
-  - WebRTC VAD による EOS 判定
-  - ASR ストリーミング
-  - NVIDIA NIM API への LLM ストリーミング
-  - sentence chunking 後の TTS ストリーミング
-  - ターン単位の JSONL ロギング
-- `infra/compose`
-  - `GPU1` 固定の `ASR NIM` / `TTS NIM`
+## Audio contracts
 
-## Audio / Data Contracts
+Microphone input is mono 16 kHz PCM16LE in 20 ms frames (640 payload bytes).
+Response audio is mono PCM16LE; use the actual sample rate carried by the audio
+frame instead of assuming a fixed output rate.
 
-- 上り音声
-  - `16kHz`
-  - `mono`
-  - `PCM16`
-  - `20ms` フレーム
-- 下り音声
-  - `24kHz`
-  - `mono`
-  - `PCM16`
-  - `40-80ms` チャンク想定
+## WebSocket protocol
 
-## WebSocket Protocol
-
-1 本の WebSocket 上で `JSON text frame` と `binary audio frame` を混在させます。
-
-### JSON Control Frame
+One connection carries JSON control messages and binary audio frames.
 
 ```json
 {
   "type": "session.start",
-  "session_id": "0f5416eb-6fc2-4b6e-ae22-44ab2df79374",
+  "session_id": null,
   "turn_id": null,
   "timestamp": "2026-04-21T07:00:00Z",
-  "payload": {
-    "locale": "ja-JP"
-  }
+  "payload": {"locale": "en-US"}
 }
 ```
 
-### Event Types
+Events include `session.start`, `mic.end`, `asr.partial`, `asr.final`,
+`llm.delta`, `tts.start`, `tts.end`, `state`, and `error`. Availability of partial
+transcripts depends on the ASR adapter. Microphone and TTS audio are binary.
 
-- `session.start`
-- `mic.end`
-- `asr.partial`
-- `asr.final`
-- `llm.delta`
-- `tts.start`
-- `tts.end`
-- `state`
-- `error`
+The binary header is 32 bytes:
 
-`mic.chunk` と `tts.chunk` は binary frame で搬送します。
+| Bytes | Field |
+| --- | --- |
+| 0–3 | Magic `ACE1` |
+| 4 | Version `1` |
+| 5 | Kind: `1` microphone, `2` TTS |
+| 6 | Codec: `1` PCM_S16LE |
+| 7 | Channel count |
+| 8–11 | Sample rate, big-endian uint32 |
+| 12–15 | Payload size, big-endian uint32 |
+| 16–31 | Turn UUID bytes |
+| 32 onward | PCM payload |
 
-### Binary Audio Frame
+## Operations
 
-ヘッダは 32 bytes です。
+The backend loads its service-local `.env`. Store credentials there and keep
+runtime logs and audio outside tracked files. `GET /healthz` checks liveness;
+`GET /status` reports provider configuration and status. Run a real audio turn
+to verify ASR connectivity and validate Unreal playback/animation separately.
 
-- bytes `0..3`: magic = `ACE1`
-- byte `4`: version = `1`
-- byte `5`: kind = `1: mic`, `2: tts`
-- byte `6`: codec = `1: PCM_S16LE`
-- byte `7`: channels
-- bytes `8..11`: sample rate, big-endian uint32
-- bytes `12..15`: payload size, big-endian uint32
-- bytes `16..31`: turn id bytes, optional
-- bytes `32..`: raw PCM payload
+The WebSocket endpoint has no authentication. Use loopback for same-host access
+or a private network/tunnel with access restricted to the intended clients.
+Response mirroring is process-local and requires one backend worker.
 
-## Latency Markers
-
-各ターンで以下を JSONL 出力します。
-
-- `vad_start_ms`
-- `eou_detected_ms`
-- `asr_final_ms`
-- `llm_first_token_ms`
-- `tts_first_audio_ms`
-- `a2f_start_ms`
-- `turn_total_ms`
-
-出力先は `/home2/ko66/ace-sandbox/logs/turns-YYYYMMDD.jsonl` です。
-
-## Unreal Integration Notes
-
-- `Audio2Face-3D` は Linux でローカル推論に寄せず、`ACE Unreal Plugin` の `RemoteA2F` プロバイダを前提にする
-- `Animation Stream` は使わない
-- 受信 TTS PCM を `USoundWaveProcedural` と `FACERuntimeModule::Get().AnimateFromAudioSamples()` の両方へ送る
-- セッション終端時は `EndAudioSamples()`、切断時は `CancelAnimationGeneration()` を呼ぶ
-
-## Persistent Storage
-
-repo 外の大きな永続領域は以下を使います。
-
-- `/home2/ko66/ace-sandbox/nim-cache/asr`
-- `/home2/ko66/ace-sandbox/nim-cache/tts`
-- `/home2/ko66/ace-sandbox/logs`
-- `/home2/ko66/ace-sandbox/audio`
-- `/home2/ko66/ace-sandbox/ue-ddc`
-- `/home2/ko66/ace-sandbox/docker`
+The optional [Linux compose templates](../../infra/compose/README.md) provide
+local speech services. Their GPU and storage paths must be adapted to the host.

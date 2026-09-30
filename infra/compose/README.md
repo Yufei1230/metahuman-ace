@@ -1,6 +1,6 @@
 # Speech NIM Compose
 
-`docker-compose.yml` は `GPU1` に ASR/TTS NIM を固定するための最小構成です。大きなキャッシュとログは `/home2/ko66/ace-sandbox` へ逃がします。
+`docker-compose.yml` pins ASR/TTS NIM to `GPU1`. Store large caches and logs outside the repository; customize the paths in `.env` for your host.
 
 ## Start
 
@@ -13,10 +13,10 @@ docker compose --env-file .env -f docker-compose.yml up -d
 
 ```bash
 python3 check_nim_stack.py --asr-http-url http://127.0.0.1:9000 --tts-http-url http://127.0.0.1:9001
-python3 check_nim_stack.py --tts-grpc 127.0.0.1:50052 --tts-text "こんにちは、音声合成の確認です。"
+python3 check_nim_stack.py --tts-grpc 127.0.0.1:50052 --tts-text "Hello, this is a speech synthesis test."
 ```
 
-ASR 実測を行う場合は `16kHz mono PCM16 WAV` を指定します。
+To test ASR, provide a `16kHz mono PCM16 WAV` file.
 
 ```bash
 python3 check_nim_stack.py --asr-grpc 127.0.0.1:50051 --asr-wav /path/to/input.wav

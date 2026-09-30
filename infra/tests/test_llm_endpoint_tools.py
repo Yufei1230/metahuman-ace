@@ -23,7 +23,6 @@ def load_module(name: str, path: Path):
 
 
 check_llm = load_module("check_llm_endpoint", ROOT / "infra" / "llm" / "check_llm_endpoint.py")
-merge_lora = load_module("merge_osaka_swallow_lora", ROOT / "infra" / "llm" / "merge_osaka_swallow_lora.py")
 
 
 class LlmEndpointToolTests(unittest.TestCase):
@@ -44,21 +43,22 @@ class LlmEndpointToolTests(unittest.TestCase):
         lines = [
             b": keepalive\n",
             b'data: {"choices":[{"delta":{"role":"assistant"}}]}\n',
-            'data: {"choices":[{"delta":{"content":"まいど"}}]}\n'.encode("utf-8"),
-            'data: {"choices":[{"delta":{"content":"。"}}]}\n'.encode("utf-8"),
+            'data: {"choices":[{"delta":{"content":"Hello"}}]}\n'.encode("utf-8"),
+            'data: {"choices":[{"delta":{"content":"."}}]}\n'.encode("utf-8"),
             b"data: [DONE]\n",
         ]
 
-        self.assertEqual(list(check_llm.parse_chat_sse_deltas(lines)), ["まいど", "。"])
+        self.assertEqual(list(check_llm.parse_chat_sse_deltas(lines)), ["Hello", "."])
 
     def test_chat_payload_can_disable_nemotron_reasoning(self) -> None:
         payload = check_llm.build_chat_payload(
             model=EXPECTED_DEFAULT_MODEL,
-            prompt="確認",
+            prompt="Check",
             max_tokens=64,
             disable_thinking=True,
         )
 
+        self.assertIn("English", payload["messages"][0]["content"])
         self.assertEqual(
             payload["chat_template_kwargs"],
             {"enable_thinking": False},
@@ -71,18 +71,6 @@ class LlmEndpointToolTests(unittest.TestCase):
         self.assertAlmostEqual(timings["ttft_ms"], 250.0)
         self.assertAlmostEqual(timings["avg_itl_ms"], 125.0)
 
-    def test_disable_thinking_by_default_makes_qwen_generation_prompt_unconditional(self) -> None:
-        original = r"""{%- if add_generation_prompt %}
-    {{- '<|im_start|>assistant\n' }}
-    {%- if enable_thinking is defined and enable_thinking is false %}
-        {{- '<think>\n\n</think>\n\n' }}
-    {%- endif %}
-{%- endif %}"""
-
-        updated = merge_lora.disable_thinking_by_default(original)
-
-        self.assertIn("<think>", updated)
-        self.assertNotIn("enable_thinking is defined", updated)
 
 
 if __name__ == "__main__":
